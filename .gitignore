@@ -35,6 +35,10 @@ wheels/
 
 # Archivos JSON generados por el comparador
 comparacion_*.json
+historial.json
+
+# Gráficas generadas
+graficas_*.png
 
 # Archivos de prueba
 prueba.py

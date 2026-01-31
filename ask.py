@@ -65,7 +65,6 @@ def run_groq(prompt):
     )
     elapsed_time = time.time() - start_time
 
-    # Calcular costo: $0.59/M tokens entrada, $0.79/M tokens salida
     tokens_input = completion.usage.prompt_tokens
     tokens_output = completion.usage.completion_tokens
     cost = (tokens_input * 0.59 / 1_000_000) + (tokens_output * 0.79 / 1_000_000)
@@ -99,73 +98,102 @@ def run_model(model_name, prompt):
 # ======================
 # MAIN
 # ======================
+
 if __name__ == "__main__":
     print()
     print(Fore.CYAN + Style.BRIGHT + "═" * 75)
-    print(Fore.CYAN + Style.BRIGHT + "  COMPARADOR DE MODELOS DE IA EL SABOR DE BERNY".center(75))
+    print(Fore.CYAN + Style.BRIGHT + "  COMPARADOR DE MODELOS DE IA".center(75))
     print(Fore.CYAN + Style.BRIGHT + "═" * 75)
     print()
     
-    # Pedir prompt al usuario
-    prompt = input(Fore.YELLOW + "Ingresa tu prompt: " + Style.RESET_ALL).strip()
-    if not prompt:
-        print(Fore.RED + Style.BRIGHT + "\n[ERROR] El prompt no puede estar vacío")
-        exit(1)
-    
-    print()
-    print(Fore.MAGENTA + "Procesando con ambos modelos...")
-    print()
-    
-    # Ejecutar ambos modelos
-    results = {
-        "timestamp": datetime.now().isoformat(),
-        "prompt": prompt,
-        "gemini": run_model("gemini", prompt),
-        "groq": run_model("groq", prompt)
-    }
-    
-    # Guardar en JSON
-    filename = f"comparacion_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(results, indent=4, ensure_ascii=False, fp=f)
-    
-    print(Fore.GREEN + Style.BRIGHT + "─" * 75)
-    print(Fore.GREEN + Style.BRIGHT + "  COMPARATIVA DE RESULTADOS".center(75))
-    print(Fore.GREEN + Style.BRIGHT + "─" * 75)
-    print()
-    
-    # Mostrar comparativa
-    for model_key in ["gemini", "groq"]:
-        data = results[model_key]
+    while True:
+        prompt = input(Fore.YELLOW + "Ingresa tu prompt (o 'salir' para terminar): " + Style.RESET_ALL).strip()
         
-        # Encabezado del modelo
-        print(Fore.WHITE + Back.BLUE + Style.BRIGHT + f" {data['model']} " + Style.RESET_ALL)
+        if prompt.lower() in ['salir', 'exit', 'quit', 'q']:
+            print()
+            print(Fore.CYAN + "👋 ¡Hasta pronto!")
+            print()
+            break
+        
+        if not prompt:
+            print(Fore.RED + Style.BRIGHT + "\n[ERROR] El prompt no puede estar vacío\n")
+            continue
+        
+        print()
+        print(Fore.MAGENTA + "Procesando con ambos modelos...")
         print()
         
-        # Métricas
-        print(Fore.CYAN + "  Tokens:")
-        print(Fore.WHITE + f"    Entrada     : " + Fore.YELLOW + f"{data['tokens_input']:>10}")
-        print(Fore.WHITE + f"    Salida      : " + Fore.YELLOW + f"{data['tokens_output']:>10}")
-        print(Fore.WHITE + f"    Total       : " + Fore.GREEN + Style.BRIGHT + f"{data['tokens_total']:>10}")
-        print()
-        print(Fore.CYAN + "  Performance:")
-        print(Fore.WHITE + f"    Tiempo      : " + Fore.YELLOW + f"{data['response_time_seconds']:>10}s")
-        print(Fore.WHITE + f"    Costo       : " + Fore.GREEN + f"${data['cost_usd']:>10.6f}")
-        print()
-        print(Fore.CYAN + "  Respuesta:")
+        try:
+            results = {
+                "timestamp": datetime.now().isoformat(),
+                "prompt": prompt,
+                "gemini": run_model("gemini", prompt),
+                "groq": run_model("groq", prompt)
+            }
+            
+            
+            historial_file = "historial.json"
+            historial = []
+            
         
-        # Mostrar respuesta con indentación
-        text_lines = data['text'].split('\n')
-        display_lines = min(5, len(text_lines))
-        for line in text_lines[:display_lines]:
-            print(Fore.WHITE + f"    {line}")
-        if len(text_lines) > display_lines:
-            print(Fore.WHITE + Style.DIM + f"    ... ({len(text_lines) - display_lines} líneas más)")
-        print()
-        print(Fore.WHITE + Style.DIM + "─" * 75)
-        print()
-    
-    print(Fore.CYAN + Style.BRIGHT + "═" * 75)
-    print(Fore.GREEN + f"Resultados completos guardados en: " + Fore.YELLOW + f"{filename}")
-    print(Fore.CYAN + Style.BRIGHT + "═" * 75)
-    print()
+            if os.path.exists(historial_file):
+                try:
+                    with open(historial_file, 'r', encoding='utf-8') as f:
+                        historial = json.load(f)
+                except:
+                    historial = []
+            
+            
+            historial.append(results)
+            
+            
+            with open(historial_file, 'w', encoding='utf-8') as f:
+                json.dump(historial, indent=4, ensure_ascii=False, fp=f)
+            
+            print(Fore.GREEN + Style.BRIGHT + "─" * 75)
+            print(Fore.GREEN + Style.BRIGHT + "  COMPARATIVA DE RESULTADOS".center(75))
+            print(Fore.GREEN + Style.BRIGHT + "─" * 75)
+            print()
+            
+            for model_key in ["gemini", "groq"]:
+                data = results[model_key]
+                
+                print(Fore.WHITE + Back.BLUE + Style.BRIGHT + f" {data['model']} " + Style.RESET_ALL)
+                print()
+                
+                print(Fore.CYAN + "  Tokens:")
+                print(Fore.WHITE + f"    Entrada     : " + Fore.YELLOW + f"{data['tokens_input']:>10}")
+                print(Fore.WHITE + f"    Salida      : " + Fore.YELLOW + f"{data['tokens_output']:>10}")
+                print(Fore.WHITE + f"    Total       : " + Fore.GREEN + Style.BRIGHT + f"{data['tokens_total']:>10}")
+                print()
+                print(Fore.CYAN + "  Performance:")
+                print(Fore.WHITE + f"    Tiempo      : " + Fore.YELLOW + f"{data['response_time_seconds']:>10}s")
+                print(Fore.WHITE + f"    Costo       : " + Fore.GREEN + f"${data['cost_usd']:>10.6f}")
+                print()
+                print(Fore.CYAN + "  Respuesta:")
+                
+                text_lines = data['text'].split('\n')
+                display_lines = min(5, len(text_lines))
+                for line in text_lines[:display_lines]:
+                    print(Fore.WHITE + f"    {line}")
+                if len(text_lines) > display_lines:
+                    print(Fore.WHITE + Style.DIM + f"    ... ({len(text_lines) - display_lines} líneas más)")
+                print()
+                print(Fore.WHITE + Style.DIM + "─" * 75)
+                print()
+            
+            print(Fore.CYAN + Style.BRIGHT + "═" * 75)
+            print(Fore.GREEN + f"Resultados guardados en historial.json (Total: {len(historial)} consultas)")
+            print(Fore.CYAN + Style.BRIGHT + "═" * 75)
+            print()
+            
+        except KeyboardInterrupt:
+            print()
+            print(Fore.CYAN + "\n👋 ¡Hasta pronto!")
+            print()
+            break
+        except Exception as e:
+            print()
+            print(Fore.RED + Style.BRIGHT + f"[ERROR] {str(e)}")
+            print()
+            continue

@@ -38,6 +38,8 @@ google-genai        (Cliente oficial de Google Gemini)
 groq                (Cliente oficial de Groq)
 colorama==0.4.6     (Colores en terminal)
 python-dotenv==1.2.1 (Gestión de variables de entorno)
+matplotlib          (Generación de gráficas)
+mplcursors          (Tooltips interactivos en gráficas)
 ```
 
 Ver `requirements.txt` para la lista completa de dependencias.
@@ -82,23 +84,52 @@ Ver `requirements.txt` para la lista completa de dependencias.
 
 ## 💻 Uso
 
-Ejecutar el comparador:
+### Ejecutar el comparador
 
 ```bash
 python ask.py
 ```
 
-El programa te pedirá que ingreses un prompt. Ejemplo:
+El programa funciona en **modo interactivo**. Te pedirá prompts continuamente hasta que decidas salir:
 
 ```
 ══════════════════════════════════════════════════════════════════════════════
                         COMPARADOR DE MODELOS DE IA                          
 ══════════════════════════════════════════════════════════════════════════════
 
-Ingresa tu prompt: Explica qué es el machine learning
+Ingresa tu prompt (o 'salir' para terminar): Explica qué es el machine learning
 
 Procesando con ambos modelos...
 ```
+
+**Características del modo interactivo:**
+- Puedes hacer múltiples consultas sin reiniciar el programa
+- Escribe `salir`, `exit`, `quit` o `q` para terminar
+- Presiona `Ctrl+C` para salir en cualquier momento
+- Cada consulta se guarda automáticamente en `historial.json`
+
+### Generar gráficas comparativas
+
+Después de ejecutar varias consultas con `ask.py`, puedes generar gráficas de comparación:
+
+```bash
+python graficar.py
+```
+
+Esto generará:
+- **6 gráficas interactivas** comparando ambos modelos:
+  - Tokens totales por consulta
+  - Tokens de entrada por consulta
+  - Tokens de salida por consulta
+  - Tiempo de respuesta por consulta
+  - Costo por consulta
+  - Costo acumulado
+- **Tooltips interactivos**: Pasa el cursor sobre cualquier punto para ver:
+  - Modelo utilizado
+  - Prompt completo de la consulta
+  - Valor específico del punto
+- **Estadísticas generales** de ambos modelos (promedios, totales)
+- **Visualización profesional** con colores modernos y diseño limpio
 
 ## 📊 Salida
 
@@ -136,38 +167,40 @@ El programa mostrará una comparativa visual en la terminal con:
 
 ### Archivo JSON
 
-Los resultados completos se guardan automáticamente en un archivo JSON con el formato:
+Los resultados se guardan en un archivo único `historial.json` que acumula todas las consultas:
 
-```
-comparacion_YYYYMMDD_HHMMSS.json
-```
-
-Contenido del JSON:
 ```json
-{
-    "timestamp": "2026-01-28T22:30:45.123456",
-    "prompt": "Tu prompt aquí",
-    "gemini": {
-        "model": "Gemini 2.5 Flash",
-        "text": "Respuesta completa...",
-        "tokens_input": 15,
-        "tokens_output": 120,
-        "tokens_total": 135,
-        "response_time_seconds": 2.35,
-        "cost_usd": 0.000305,
-        "raw_response": {...}
+[
+    {
+        "timestamp": "2026-01-28T22:30:45.123456",
+        "prompt": "Tu primer prompt",
+        "gemini": {
+            "model": "Gemini 2.5 Flash",
+            "text": "Respuesta completa...",
+            "tokens_input": 15,
+            "tokens_output": 120,
+            "tokens_total": 135,
+            "response_time_seconds": 2.35,
+            "cost_usd": 0.000305,
+            "raw_response": {...}
+        },
+        "groq": {
+            "model": "Llama 3.3 70B (Groq)",
+            "text": "Respuesta completa...",
+            "tokens_input": 12,
+            "tokens_output": 95,
+            "tokens_total": 107,
+            "response_time_seconds": 1.87,
+            "cost_usd": 0.000082,
+            "raw_response": {...}
+        }
     },
-    "groq": {
-        "model": "Llama 3.3 70B (Groq)",
-        "text": "Respuesta completa...",
-        "tokens_input": 12,
-        "tokens_output": 95,
-        "tokens_total": 107,
-        "response_time_seconds": 1.87,
-        "cost_usd": 0.000082,
-        "raw_response": {...}
+    {
+        "timestamp": "2026-01-28T22:35:12.987654",
+        "prompt": "Tu segundo prompt",
+        ...
     }
-}
+]
 ```
 
 ## 🔧 Estructura del Proyecto
@@ -175,12 +208,13 @@ Contenido del JSON:
 ```
 Topicos/
 │
-├── ask.py              # Script principal
-├── requirements.txt    # Dependencias de Python
-├── .env               # Variables de entorno (no incluido en git)
-├── .gitignore         # Archivos ignorados por git
-├── README.md          # Este archivo
-└── comparacion_*.json # Archivos de salida generados
+├── ask.py                 # Script principal de comparación (modo interactivo)
+├── graficar.py            # Generador de gráficas comparativas interactivas
+├── requirements.txt       # Dependencias de Python
+├── .env                   # Variables de entorno (no incluido en git)
+├── .gitignore            # Archivos ignorados por git
+├── README.md             # Este archivo
+└── historial.json        # Historial de consultas (generado)
 ```
 
 ## 💰 Cálculo de Costos
