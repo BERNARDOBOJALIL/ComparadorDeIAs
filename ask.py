@@ -6,6 +6,7 @@ from datetime import datetime
 from google import genai
 from groq import Groq
 from colorama import Fore, Back, Style, init
+from schemas.llm_response import LLMResponse
 
 # Inicializar colorama
 init(autoreset=True)
@@ -23,11 +24,21 @@ def run_gemini(prompt):
         )
 
     client = genai.Client(api_key=api_key)
+    
+    # Formato JSON requerido
+    json_prompt = f"""{prompt}
+
+Responde ÚNICAMENTE en formato JSON con esta estructura, sin bloques markdown:
+{{
+    "respuesta": "tu respuesta aquí",
+    "confianza": 0.95,
+    "categoria": "categoría apropiada"
+}}"""
 
     start_time = time.time()
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=prompt,
+        contents=json_prompt,
     )
     elapsed_time = time.time() - start_time
 
@@ -38,9 +49,24 @@ def run_gemini(prompt):
     tokens_output = getattr(usage_meta, "candidates_token_count", 0) if usage_meta else 0
     cost = (tokens_input * 0.30 / 1_000_000) + (tokens_output * 2.50 / 1_000_000)
     
+    response_text = getattr(response, "text", str(response))
+    
+    # Validar con schema Pydantic
+    try:
+        validated_response = LLMResponse.model_validate_json(response_text)
+        validated = True
+        validation_error = None
+    except Exception as e:
+        validated = False
+        validation_error = str(e)
+        validated_response = None
+    
     output = {
         "model": "Gemini 2.5 Flash",
-        "text": getattr(response, "text", str(response)),
+        "text": response_text,
+        "validated": validated,
+        "validation_error": validation_error,
+        "parsed_response": validated_response.model_dump() if validated_response else None,
         "tokens_input": tokens_input if tokens_input > 0 else None,
         "tokens_output": tokens_output if tokens_output > 0 else None,
         "tokens_total": getattr(usage_meta, "total_token_count", None) if usage_meta else None,
@@ -57,21 +83,46 @@ def run_gemini(prompt):
 # ======================
 def run_groq(prompt):
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    
+    # Formato JSON requerido
+    json_prompt = f"""{prompt}
+
+Responde ÚNICAMENTE en formato JSON con esta estructura:
+{{
+    "respuesta": "tu respuesta aquí",
+    "confianza": 0.95,
+    "categoria": "categoría apropiada"
+}}"""
 
     start_time = time.time()
     completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{"role": "user", "content": json_prompt}]
     )
     elapsed_time = time.time() - start_time
 
     tokens_input = completion.usage.prompt_tokens
     tokens_output = completion.usage.completion_tokens
     cost = (tokens_input * 0.59 / 1_000_000) + (tokens_output * 0.79 / 1_000_000)
+    
+    response_text = completion.choices[0].message.content
+    
+    # Validar con schema Pydantic
+    try:
+        validated_response = LLMResponse.model_validate_json(response_text)
+        validated = True
+        validation_error = None
+    except Exception as e:
+        validated = False
+        validation_error = str(e)
+        validated_response = None
 
     output = {
         "model": "Llama 3.3 70B (Groq)",
-        "text": completion.choices[0].message.content,
+        "text": response_text,
+        "validated": validated,
+        "validation_error": validation_error,
+        "parsed_response": validated_response.model_dump() if validated_response else None,
         "tokens_input": tokens_input,
         "tokens_output": tokens_output,
         "tokens_total": completion.usage.total_tokens,
@@ -161,6 +212,13 @@ if __name__ == "__main__":
                 print(Fore.WHITE + Back.BLUE + Style.BRIGHT + f" {data['model']} " + Style.RESET_ALL)
                 print()
                 
+                # Validación
+                if data.get('validated'):
+                    print(Fore.GREEN + "  ✓ Respuesta validada con schema Pydantic")
+                else:
+                    print(Fore.RED + "  ✗ Error de validación: " + Fore.YELLOW + str(data.get('validation_error')))
+                print()
+                
                 print(Fore.CYAN + "  Tokens:")
                 print(Fore.WHITE + f"    Entrada     : " + Fore.YELLOW + f"{data['tokens_input']:>10}")
                 print(Fore.WHITE + f"    Salida      : " + Fore.YELLOW + f"{data['tokens_output']:>10}")
@@ -170,14 +228,25 @@ if __name__ == "__main__":
                 print(Fore.WHITE + f"    Tiempo      : " + Fore.YELLOW + f"{data['response_time_seconds']:>10}s")
                 print(Fore.WHITE + f"    Costo       : " + Fore.GREEN + f"${data['cost_usd']:>10.6f}")
                 print()
-                print(Fore.CYAN + "  Respuesta:")
                 
-                text_lines = data['text'].split('\n')
-                display_lines = min(5, len(text_lines))
-                for line in text_lines[:display_lines]:
-                    print(Fore.WHITE + f"    {line}")
-                if len(text_lines) > display_lines:
-                    print(Fore.WHITE + Style.DIM + f"    ... ({len(text_lines) - display_lines} líneas más)")
+                # Mostrar respuesta parseada si está validada
+                if data.get('parsed_response'):
+                    print(Fore.CYAN + "  Respuesta Estructurada:")
+                    parsed = data['parsed_response']
+                    print(Fore.WHITE + f"    Respuesta   : " + Fore.YELLOW + parsed.get('respuesta', 'N/A')[:80])
+                    if parsed.get('confianza') is not None:
+                        print(Fore.WHITE + f"    Confianza   : " + Fore.GREEN + f"{parsed.get('confianza'):.2f}")
+                    if parsed.get('categoria'):
+                        print(Fore.WHITE + f"    Categoría   : " + Fore.CYAN + parsed.get('categoria'))
+                else:
+                    print(Fore.CYAN + "  Respuesta (raw):")
+                    text_lines = data['text'].split('\n')
+                    display_lines = min(5, len(text_lines))
+                    for line in text_lines[:display_lines]:
+                        print(Fore.WHITE + f"    {line}")
+                    if len(text_lines) > display_lines:
+                        print(Fore.WHITE + Style.DIM + f"    ... ({len(text_lines) - display_lines} líneas más)")
+                
                 print()
                 print(Fore.WHITE + Style.DIM + "─" * 75)
                 print()
